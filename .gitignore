@@ -1,0 +1,20 @@
+# Secrets and local-only files — never commit these
+devices.yaml
+.env
+*.env
+*.vault-password
+*vault*.yml
+
+# Generated output
+reports/
+backups/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+
+# Ansible
+*.retry

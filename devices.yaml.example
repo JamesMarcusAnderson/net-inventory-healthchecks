@@ -1,0 +1,36 @@
+# Example lab inventory for net-inventory-healthchecks.
+#
+# *** IMPORTANT ***
+# Real inventories stay OUT of git. Copy this file to devices.yaml,
+# fill in YOUR lab devices, and never commit the real one:
+#     cp devices.yaml.example devices.yaml
+# devices.yaml is covered by .gitignore.
+#
+# All addresses below are from 192.0.2.0/24 (TEST-NET-1, RFC 5737) and
+# 203.0.113.0/24 (TEST-NET-3) — reserved documentation ranges that can
+# never be real production addresses. Use your own lab IPs in devices.yaml.
+
+devices:
+  - name: core-switch-lab
+    host: 192.0.2.11
+    dns_name: core-switch.lab.example
+    ports: [22, 443]
+    notes: Lab core switch (example entry)
+
+  - name: access-switch-lab
+    host: 192.0.2.12
+    dns_name: access-switch.lab.example
+    ports: [22]
+    notes: Lab access switch (example entry)
+
+  - name: router-lab
+    host: 192.0.2.21
+    dns_name: router.lab.example
+    ports: [22, 443]
+    notes: Lab edge router (example entry)
+
+  - name: syslog-lab
+    host: 203.0.113.31
+    # no dns_name here on purpose: shows how the script reports SKIP
+    ports: [514, 6514]
+    notes: Lab syslog collector (example entry)

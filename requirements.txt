@@ -1,0 +1,7 @@
+# Pinned runtime dependencies for inventory.py
+PyYAML==6.0.2
+
+# Ansible is intentionally NOT pinned here: install the version your lab
+# standardizes on, plus the network collection you need, e.g.:
+#   pip install ansible-core
+#   ansible-galaxy collection install cisco.ios

@@ -1,0 +1,72 @@
+---
+# backup-configs.yml — Ansible playbook: back up running configs from LAB devices.
+#
+# LAB USE ONLY. Never point this at production gear without change control.
+#
+# Credentials are NEVER stored here. Provide them at runtime:
+#   - export ANSIBLE_NET_USER / ANSIBLE_NET_PASSWORD, or
+#   - use ansible-vault (see docs/shift-use.md).
+#
+# Requires: ansible-core and a network collection that provides the
+# ios_command/ios_config modules, e.g.:
+#   ansible-galaxy collection install cisco.ios
+#
+# Run (dry check first):
+#   ansible-playbook backup-configs.yml --check
+#   ansible-playbook backup-configs.yml -i lab-inventory.ini
+
+- name: Back up running configs from lab network devices
+  hosts: lab_switches
+  gather_facts: false
+  connection: network_cli
+
+  vars:
+    ansible_network_os: ios
+    ansible_user: "{{ lookup('env', 'ANSIBLE_NET_USER') }}"
+    ansible_password: "{{ lookup('env', 'ANSIBLE_NET_PASSWORD') }}"
+    # Local directory for timestamped backups (kept out of git via .gitignore)
+    backup_dir: "{{ playbook_dir }}/backups"
+
+  pre_tasks:
+    - name: Fail fast if credentials are not provided
+      ansible.builtin.fail:
+        msg: >-
+          Set ANSIBLE_NET_USER and ANSIBLE_NET_PASSWORD in the environment,
+          or re-run with --ask-pass. Credentials are never stored in this repo.
+      when: ansible_user == "" or ansible_password == ""
+
+    - name: Ensure local backup directory exists
+      ansible.builtin.file:
+        path: "{{ backup_dir }}"
+        state: directory
+        mode: "0700"
+      delegate_to: localhost
+      run_once: true
+
+  tasks:
+    - name: Pull running config from device
+      cisco.ios.ios_command:
+        commands:
+          - show running-config
+      register: running_cfg
+      # Never log the config content to console output in shared terminals
+      no_log: true
+
+    - name: Write timestamped backup locally
+      ansible.builtin.copy:
+        content: "{{ running_cfg.stdout[0] }}"
+        dest: >-
+          {{ backup_dir }}/{{ inventory_hostname }}-{{
+          lookup('pipe', 'date -u +%Y%m%d-%H%M%S') }}.cfg
+        mode: "0600"
+      delegate_to: localhost
+      when: running_cfg is succeeded
+
+    - name: Confirm backup landed
+      ansible.builtin.stat:
+        path: >-
+          {{ backup_dir }}/{{ inventory_hostname }}-{{
+          lookup('pipe', 'date -u +%Y%m%d-%H%M%S') }}.cfg
+      delegate_to: localhost
+      register: backup_stat
+      failed_when: not backup_stat.stat.exists
