@@ -26,14 +26,17 @@ python3 inventory.py
 diff reports/healthcheck-<before>.md reports/healthcheck-<after>.md
 ```
 
-If the only deltas are the device you touched, you are clean.
+If the only deltas are the `Generated:` timestamp line and the device you
+touched, you are clean. (The timestamp line changes on every run — ignore it.)
 
 ## Config backups with Ansible
 
 ```bash
 ansible-galaxy collection install cisco.ios   # once
 export ANSIBLE_NET_USER='your-lab-user'
-export ANSIBLE_NET_PASSWORD='your-lab-password'   # or use --ask-pass
+export ANSIBLE_NET_PASSWORD='your-lab-password'
+# ...or skip the exports and answer an interactive prompt instead:
+# ansible-playbook backup-configs.yml -i lab-inventory.ini -u <lab-user> --ask-pass
 ansible-playbook backup-configs.yml --check       # dry run first
 ansible-playbook backup-configs.yml -i lab-inventory.ini
 ```
