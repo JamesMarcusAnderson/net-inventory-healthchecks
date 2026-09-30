@@ -4,8 +4,11 @@
 # LAB USE ONLY. Never point this at production gear without change control.
 #
 # Credentials are NEVER stored here. Provide them at runtime:
-#   - export ANSIBLE_NET_USER / ANSIBLE_NET_PASSWORD, or
-#   - use ansible-vault (see docs/shift-use.md).
+#   export ANSIBLE_NET_USER='your-lab-user'
+#   export ANSIBLE_NET_PASSWORD='your-lab-password'
+# or use an interactive prompt instead:
+#   ansible-playbook backup-configs.yml -i lab-inventory.ini -u <lab-user> --ask-pass
+# For anything shared or scheduled, use ansible-vault (see docs/shift-use.md).
 #
 # Requires: ansible-core and a network collection that provides the
 # ios_command/ios_config modules, e.g.:
@@ -22,18 +25,36 @@
 
   vars:
     ansible_network_os: ios
-    ansible_user: "{{ lookup('env', 'ANSIBLE_NET_USER') }}"
-    ansible_password: "{{ lookup('env', 'ANSIBLE_NET_PASSWORD') }}"
     # Local directory for timestamped backups (kept out of git via .gitignore)
     backup_dir: "{{ playbook_dir }}/backups"
+    # NOTE: ansible_user / ansible_password are intentionally NOT set here.
+    # Play-level vars would override --ask-pass, so credentials are resolved
+    # in pre_tasks instead (see below).
 
   pre_tasks:
+    - name: Compute single run timestamp for backup filenames
+      ansible.builtin.set_fact:
+        # Evaluated once per host. The write step and the verify step both
+        # use this value, so they can never disagree if the clock ticks
+        # over a second boundary between the two tasks.
+        backup_stamp: "{{ lookup('pipe', 'date -u +%Y%m%d-%H%M%S') }}"
+
+    - name: Resolve credentials from environment when provided
+      ansible.builtin.set_fact:
+        ansible_user: "{{ lookup('env', 'ANSIBLE_NET_USER') }}"
+        ansible_password: "{{ lookup('env', 'ANSIBLE_NET_PASSWORD') }}"
+      # Skipped when the env var is absent so an interactive --ask-pass
+      # prompt (or -e extra vars) is never clobbered by an empty value.
+      when: lookup('env', 'ANSIBLE_NET_USER') | length > 0
+      no_log: true
+
     - name: Fail fast if credentials are not provided
       ansible.builtin.fail:
         msg: >-
           Set ANSIBLE_NET_USER and ANSIBLE_NET_PASSWORD in the environment,
-          or re-run with --ask-pass. Credentials are never stored in this repo.
-      when: ansible_user == "" or ansible_password == ""
+          or re-run with -u <lab-user> --ask-pass.
+          Credentials are never stored in this repo.
+      when: (ansible_user | default('')) == "" or (ansible_password | default('')) == ""
 
     - name: Ensure local backup directory exists
       ansible.builtin.file:
@@ -55,18 +76,14 @@
     - name: Write timestamped backup locally
       ansible.builtin.copy:
         content: "{{ running_cfg.stdout[0] }}"
-        dest: >-
-          {{ backup_dir }}/{{ inventory_hostname }}-{{
-          lookup('pipe', 'date -u +%Y%m%d-%H%M%S') }}.cfg
+        dest: "{{ backup_dir }}/{{ inventory_hostname }}-{{ backup_stamp }}.cfg"
         mode: "0600"
       delegate_to: localhost
       when: running_cfg is succeeded
 
     - name: Confirm backup landed
       ansible.builtin.stat:
-        path: >-
-          {{ backup_dir }}/{{ inventory_hostname }}-{{
-          lookup('pipe', 'date -u +%Y%m%d-%H%M%S') }}.cfg
+        path: "{{ backup_dir }}/{{ inventory_hostname }}-{{ backup_stamp }}.cfg"
       delegate_to: localhost
       register: backup_stat
       failed_when: not backup_stat.stat.exists
