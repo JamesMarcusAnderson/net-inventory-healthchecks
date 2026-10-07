@@ -6,6 +6,10 @@ your lab devices and tests reachability, DNS resolution, and key TCP ports,
 plus an Ansible playbook that backs up running configs before you touch
 anything.
 
+Built as operational tooling: deterministic exit codes for scripting,
+timestamped reports for shift handoffs, a dry-run mode for safe testing,
+and credential handling that keeps secrets out of version control.
+
 ## What it checks
 
 - **ICMP reachability** — is the device answering ping?
@@ -13,6 +17,13 @@ anything.
 - **TCP ports** — are the key service ports (SSH, HTTPS, syslog) open?
 - **Config backups** — timestamped `show running-config` snapshots via Ansible,
   so a bad change is always reversible.
+
+## Prerequisites
+
+- Python 3.8+
+- A `ping` binary on PATH (standard on Linux and macOS)
+- For config backups: `ansible-core` plus the `cisco.ios` collection
+  (`pip install ansible-core && ansible-galaxy collection install cisco.ios`)
 
 ## Quickstart
 
@@ -25,6 +36,16 @@ python3 inventory.py --dry-run          # simulate, touches no network
 
 Exit codes: `0` = all healthy, `1` = something failed, `2` = inventory error.
 Every run writes a timestamped report to `reports/`.
+
+## Repository structure
+
+| Path | What it is |
+|---|---|
+| `inventory.py` | The health checker — Python standard library plus PyYAML only |
+| `devices.yaml.example` | Example inventory using RFC 5737 documentation IPs (never real hosts) |
+| `backup-configs.yml` | Ansible playbook: timestamped `show running-config` backups with `0600` permissions |
+| `docs/shift-use.md` | How a shift uses this: pre-shift checks, post-change diffs, safe credential practices |
+| `requirements.txt` | Pinned Python dependency (PyYAML); Ansible intentionally unpinned (use your lab's standard) |
 
 ## Sample report output
 
